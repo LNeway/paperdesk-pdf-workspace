@@ -2,6 +2,8 @@
 
 浏览器内运行的 PDF 页面整理工具。用户可选择 PDF、PNG、JPG 或 WEBP 文件，在统一工作台中调整页序、页面尺寸、背景、图片适配方式和旋转角度，并导出新的 PDF。
 
+生产地址：`https://lnew.github.io/paperdesk-pdf-workspace/`
+
 ## 本地处理
 
 - 文件不会上传到服务器。
