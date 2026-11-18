@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Copy,
   RotateCw,
@@ -5,6 +6,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Alignment, ImageFit, Orientation, PageItem, SizeMode } from '../types';
+import { PAGE_DIMENSION_LIMITS, validatePageDimension } from '../lib/page-dimensions';
 import { getMixedValue, getPageSize } from '../lib/page-layout';
 
 interface InspectorProps {
@@ -69,6 +71,29 @@ export function Inspector({
   onDuplicate,
   onDelete,
 }: InspectorProps) {
+  const [dimensionDrafts, setDimensionDrafts] = useState({ width: '', height: '' });
+  const [dimensionErrors, setDimensionErrors] = useState({ width: '', height: '' });
+  const sizeMode = getMixedValue(selectedPages, (page) => page.sizeMode);
+  const orientation = getMixedValue(selectedPages, (page) => page.orientation);
+  const background = getMixedValue(selectedPages, (page) => page.background);
+  const margin = getMixedValue(selectedPages, (page) => page.marginMm);
+  const customWidth = getMixedValue(selectedPages, (page) => page.customWidthMm);
+  const customHeight = getMixedValue(selectedPages, (page) => page.customHeightMm);
+  const fit = getMixedValue(selectedPages, (page) => page.fit);
+  const alignment = getMixedValue(selectedPages, (page) => page.alignment);
+  const scale = getMixedValue(selectedPages, (page) => page.scale);
+  const offsetX = getMixedValue(selectedPages, (page) => page.offsetX);
+  const offsetY = getMixedValue(selectedPages, (page) => page.offsetY);
+  const selectionKey = selectedPages.map((page) => page.id).join('|');
+
+  useEffect(() => {
+    setDimensionDrafts({
+      width: customWidth === 'multiple' ? '' : String(customWidth),
+      height: customHeight === 'multiple' ? '' : String(customHeight),
+    });
+    setDimensionErrors({ width: '', height: '' });
+  }, [customHeight, customWidth, selectionKey, sizeMode]);
+
   if (!selectedPages.length) {
     return (
       <aside className="inspector" aria-labelledby="inspector-title">
@@ -100,18 +125,38 @@ export function Inspector({
     );
   }
 
-  const sizeMode = getMixedValue(selectedPages, (page) => page.sizeMode);
-  const orientation = getMixedValue(selectedPages, (page) => page.orientation);
-  const background = getMixedValue(selectedPages, (page) => page.background);
-  const margin = getMixedValue(selectedPages, (page) => page.marginMm);
-  const fit = getMixedValue(selectedPages, (page) => page.fit);
-  const alignment = getMixedValue(selectedPages, (page) => page.alignment);
-  const scale = getMixedValue(selectedPages, (page) => page.scale);
-  const offsetX = getMixedValue(selectedPages, (page) => page.offsetX);
-  const offsetY = getMixedValue(selectedPages, (page) => page.offsetY);
   const allImages = selectedPages.every((page) => page.kind === 'image');
   const first = selectedPages[0];
   const firstSize = getPageSize(first);
+
+  const updateDimension = (axis: 'width' | 'height', input: string) => {
+    const label = axis === 'width' ? '宽度' : '高度';
+    const validation = validatePageDimension(input, label);
+    setDimensionDrafts((current) => ({ ...current, [axis]: input }));
+    setDimensionErrors((current) => ({ ...current, [axis]: validation.error ?? '' }));
+    if (validation.valid) {
+      onUpdate(
+        axis === 'width'
+          ? { customWidthMm: validation.value ?? PAGE_DIMENSION_LIMITS.minMm }
+          : { customHeightMm: validation.value ?? PAGE_DIMENSION_LIMITS.minMm },
+      );
+    }
+  };
+
+  const commitDimension = (axis: 'width' | 'height') => {
+    const label = axis === 'width' ? '宽度' : '高度';
+    const validation = validatePageDimension(dimensionDrafts[axis], label);
+    if (validation.valid) {
+      setDimensionErrors((current) => ({ ...current, [axis]: '' }));
+      return;
+    }
+    const previousValue = axis === 'width' ? first.customWidthMm : first.customHeightMm;
+    setDimensionDrafts((current) => ({ ...current, [axis]: String(previousValue) }));
+    setDimensionErrors((current) => ({
+      ...current,
+      [axis]: `${validation.error ?? `${label}无效。`} 已恢复为 ${previousValue} mm。`,
+    }));
+  };
 
   return (
     <aside className="inspector" aria-labelledby="inspector-title">
@@ -152,35 +197,63 @@ export function Inspector({
           />
           {sizeMode === 'custom' ? (
             <div className="two-column-fields">
-              <label className="number-field">
+              <label className={`number-field ${dimensionErrors.width ? 'has-error' : ''}`}>
                 <span>宽度</span>
                 <span className="input-with-unit">
                   <input
+                    id="custom-width"
+                    name="custom-width"
                     type="number"
-                    min={20}
-                    max={1000}
-                    value={first.customWidthMm}
-                    onChange={(event) =>
-                      onUpdate({ customWidthMm: Math.max(20, Number(event.target.value) || 20) })
-                    }
+                    min={PAGE_DIMENSION_LIMITS.minMm}
+                    max={PAGE_DIMENSION_LIMITS.maxMm}
+                    step={1}
+                    inputMode="decimal"
+                    value={dimensionDrafts.width}
+                    placeholder={customWidth === 'multiple' ? '多个值' : undefined}
+                    aria-invalid={Boolean(dimensionErrors.width)}
+                    aria-describedby={dimensionErrors.width ? 'custom-width-error' : undefined}
+                    onChange={(event) => updateDimension('width', event.target.value)}
+                    onBlur={() => commitDimension('width')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') event.currentTarget.blur();
+                    }}
                   />
                   <span>mm</span>
                 </span>
+                {dimensionErrors.width ? (
+                  <span id="custom-width-error" className="field-error">
+                    {dimensionErrors.width}
+                  </span>
+                ) : null}
               </label>
-              <label className="number-field">
+              <label className={`number-field ${dimensionErrors.height ? 'has-error' : ''}`}>
                 <span>高度</span>
                 <span className="input-with-unit">
                   <input
+                    id="custom-height"
+                    name="custom-height"
                     type="number"
-                    min={20}
-                    max={1000}
-                    value={first.customHeightMm}
-                    onChange={(event) =>
-                      onUpdate({ customHeightMm: Math.max(20, Number(event.target.value) || 20) })
-                    }
+                    min={PAGE_DIMENSION_LIMITS.minMm}
+                    max={PAGE_DIMENSION_LIMITS.maxMm}
+                    step={1}
+                    inputMode="decimal"
+                    value={dimensionDrafts.height}
+                    placeholder={customHeight === 'multiple' ? '多个值' : undefined}
+                    aria-invalid={Boolean(dimensionErrors.height)}
+                    aria-describedby={dimensionErrors.height ? 'custom-height-error' : undefined}
+                    onChange={(event) => updateDimension('height', event.target.value)}
+                    onBlur={() => commitDimension('height')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') event.currentTarget.blur();
+                    }}
                   />
                   <span>mm</span>
                 </span>
+                {dimensionErrors.height ? (
+                  <span id="custom-height-error" className="field-error">
+                    {dimensionErrors.height}
+                  </span>
+                ) : null}
               </label>
             </div>
           ) : (

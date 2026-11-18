@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Undo2,
+  X,
 } from 'lucide-react';
 import { ExportDrawer } from './components/ExportDrawer';
 import { IconButton } from './components/IconButton';
@@ -230,6 +232,15 @@ function App() {
     });
   };
 
+  const selectAllPages = () => {
+    setSelectedIds(pages.map((page) => page.id));
+    setActiveId((current) => current ?? pages[0]?.id ?? null);
+  };
+
+  const clearPageSelection = () => {
+    setSelectedIds([]);
+  };
+
   const addBlankPage = () => {
     const blank = createBlankPage();
     const insertAt = activeIndex >= 0 ? activeIndex + 1 : pages.length;
@@ -372,7 +383,10 @@ function App() {
       </header>
 
       <main className="workspace-grid">
-        <div className={`rail-slot ${mobilePanel === 'pages' ? 'is-mobile-open' : ''}`}>
+        <div
+          id="pages-panel"
+          className={`rail-slot ${mobilePanel === 'pages' ? 'is-mobile-open' : ''}`}
+        >
           <PageRail
             pages={pages}
             selectedIds={selectedIds}
@@ -380,6 +394,9 @@ function App() {
             onSelect={selectPage}
             onReorder={reorder}
             onMove={movePage}
+            onSelectAll={selectAllPages}
+            onClearSelection={clearPageSelection}
+            onDeleteSelection={deleteSelected}
             onAdd={() => fileInputRef.current?.click()}
             onAddBlank={addBlankPage}
           />
@@ -398,57 +415,83 @@ function App() {
               </span>
             ) : null}
           </div>
-          <div className="canvas-scroll">
-            {activePage ? (
-              <div className="canvas-page-wrap">
-                <h1 id="canvas-title" className="visually-hidden">
-                  {documentName} 第 {activeIndex + 1} 页
-                </h1>
-                <PageCanvas page={activePage} zoom={zoom} />
-                <div className="canvas-navigation" aria-label="页面导航">
-                  <IconButton
-                    label="上一页"
-                    icon={<ChevronLeft size={18} />}
-                    disabled={activeIndex <= 0}
-                    onClick={() => {
-                      const previous = pages[activeIndex - 1];
-                      if (previous) {
-                        setActiveId(previous.id);
-                        setSelectedIds([previous.id]);
-                      }
-                    }}
-                  />
-                  <span>
-                    {activeIndex + 1} / {pages.length}
-                  </span>
-                  <IconButton
-                    label="下一页"
-                    icon={<ChevronRight size={18} />}
-                    disabled={activeIndex >= pages.length - 1}
-                    onClick={() => {
-                      const next = pages[activeIndex + 1];
-                      if (next) {
-                        setActiveId(next.id);
-                        setSelectedIds([next.id]);
-                      }
-                    }}
-                  />
+          <div className="canvas-body">
+            {importErrors.length ? (
+              <div className="import-notice" role="alert">
+                <AlertTriangle size={18} aria-hidden="true" />
+                <div>
+                  <strong>部分文件未添加</strong>
+                  <ul>
+                    {importErrors.map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            ) : (
-              <div className="canvas-empty">
-                <FilePlus2 size={30} aria-hidden="true" />
-                <h2 id="canvas-title">工作台为空</h2>
-                <p>添加文件或插入空白页后开始整理。</p>
-                <button type="button" className="primary-button" onClick={() => fileInputRef.current?.click()}>
-                  添加文件
+                <button
+                  type="button"
+                  className="small-icon-button"
+                  onClick={() => setImportErrors([])}
+                  aria-label="关闭导入错误提示"
+                >
+                  <X size={17} aria-hidden="true" />
                 </button>
               </div>
-            )}
+            ) : null}
+            <div className="canvas-scroll">
+              {activePage ? (
+                <div className="canvas-page-wrap">
+                  <h1 id="canvas-title" className="visually-hidden">
+                    {documentName} 第 {activeIndex + 1} 页
+                  </h1>
+                  <PageCanvas page={activePage} zoom={zoom} />
+                  <div className="canvas-navigation" aria-label="页面导航">
+                    <IconButton
+                      label="上一页"
+                      icon={<ChevronLeft size={18} />}
+                      disabled={activeIndex <= 0}
+                      onClick={() => {
+                        const previous = pages[activeIndex - 1];
+                        if (previous) {
+                          setActiveId(previous.id);
+                          setSelectedIds([previous.id]);
+                        }
+                      }}
+                    />
+                    <span>
+                      {activeIndex + 1} / {pages.length}
+                    </span>
+                    <IconButton
+                      label="下一页"
+                      icon={<ChevronRight size={18} />}
+                      disabled={activeIndex >= pages.length - 1}
+                      onClick={() => {
+                        const next = pages[activeIndex + 1];
+                        if (next) {
+                          setActiveId(next.id);
+                          setSelectedIds([next.id]);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="canvas-empty">
+                  <FilePlus2 size={30} aria-hidden="true" />
+                  <h2 id="canvas-title">工作台为空</h2>
+                  <p>添加文件或插入空白页后开始整理。</p>
+                  <button type="button" className="primary-button" onClick={() => fileInputRef.current?.click()}>
+                    添加文件
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
-        <div className={`inspector-slot ${mobilePanel === 'properties' ? 'is-mobile-open' : ''}`}>
+        <div
+          id="properties-panel"
+          className={`inspector-slot ${mobilePanel === 'properties' ? 'is-mobile-open' : ''}`}
+        >
           <Inspector
             pages={pages}
             selectedPages={selectedPages}
@@ -497,6 +540,8 @@ function App() {
           type="button"
           className={mobilePanel === 'pages' ? 'is-active' : ''}
           aria-pressed={mobilePanel === 'pages'}
+          aria-controls="pages-panel"
+          aria-expanded={mobilePanel === 'pages'}
           onClick={() => setMobilePanel((current) => (current === 'pages' ? null : 'pages'))}
         >
           <LayoutPanelLeft size={19} aria-hidden="true" />
@@ -506,6 +551,8 @@ function App() {
           type="button"
           className={mobilePanel === 'properties' ? 'is-active' : ''}
           aria-pressed={mobilePanel === 'properties'}
+          aria-controls="properties-panel"
+          aria-expanded={mobilePanel === 'properties'}
           onClick={() =>
             setMobilePanel((current) => (current === 'properties' ? null : 'properties'))
           }
@@ -551,7 +598,6 @@ function App() {
 
       <div className="visually-hidden" aria-live="polite">
         {importing ? importProgress.label : ''}
-        {importErrors.join(' ')}
       </div>
       <div className="visually-hidden">
         最多 {FILE_LIMITS.maxFiles} 个文件，单文件不超过 50 MB，总量不超过 200 MB，最多 200 页。

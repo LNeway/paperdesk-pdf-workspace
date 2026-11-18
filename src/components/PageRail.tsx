@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GripVertical, Plus } from 'lucide-react';
 import type { PageItem } from '../types';
+import { getPageListShortcut } from '../lib/page-shortcuts';
 import { PageThumbnail } from './PageThumbnail';
 
 interface PageRailProps {
@@ -10,6 +11,9 @@ interface PageRailProps {
   onSelect: (pageId: string, event: React.MouseEvent | React.KeyboardEvent) => void;
   onReorder: (from: number, to: number) => void;
   onMove: (pageId: string, direction: -1 | 1) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  onDeleteSelection: () => void;
   onAdd: () => void;
   onAddBlank: () => void;
 }
@@ -21,6 +25,9 @@ export function PageRail({
   onSelect,
   onReorder,
   onMove,
+  onSelectAll,
+  onClearSelection,
+  onDeleteSelection,
   onAdd,
   onAddBlank,
 }: PageRailProps) {
@@ -39,7 +46,25 @@ export function PageRail({
         </button>
       </div>
 
-      <ol className="page-list" aria-label="页面序列">
+      <ol
+        className="page-list"
+        aria-label="页面序列"
+        aria-keyshortcuts="Control+A Meta+A Escape Delete Backspace"
+        onKeyDown={(event) => {
+          const shortcut = getPageListShortcut({
+            key: event.key,
+            metaKey: event.metaKey,
+            ctrlKey: event.ctrlKey,
+            altKey: event.altKey,
+            target: event.target as HTMLElement,
+          });
+          if (!shortcut) return;
+          event.preventDefault();
+          if (shortcut === 'select-all') onSelectAll();
+          if (shortcut === 'clear-selection') onClearSelection();
+          if (shortcut === 'delete-selection') onDeleteSelection();
+        }}
+      >
         {pages.map((page, index) => {
           const selected = selectedIds.includes(page.id);
           const active = activeId === page.id;
