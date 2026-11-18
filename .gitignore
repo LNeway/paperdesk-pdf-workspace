@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.playwright-cli/
+.multica/
+output/
+fixtures/
+attachments/
+AGENTS.md
+*.log
+.DS_Store
